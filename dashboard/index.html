@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RetailLens Marketplace · Seller Scorecard</title>
+<style>
+  :root{--ink:#1b1f23;--paper:#f6f5f1;--line:#d8d4c8;--good:#2e6b4f;--bad:#a3402e;--mid:#b6883a;--accent:#1f4d63;--card:#fff}
+  *{box-sizing:border-box} body{margin:0;font-family:'IBM Plex Sans',Arial,sans-serif;background:var(--paper);color:var(--ink)}
+  header{padding:36px 48px 20px;border-bottom:1px solid var(--line)} header h1{font-family:Georgia,'Times New Roman',serif;font-weight:600;font-size:28px;margin:0 0 4px} header p{margin:0;color:#555;font-size:14px;max-width:640px;line-height:1.5}
+  .kpis{display:flex;gap:1px;background:var(--line);border:1px solid var(--line);margin:24px 48px}.kpi{flex:1;background:var(--card);padding:18px 20px}.kpi .num{font-family:Georgia,serif;font-size:26px;font-weight:600}.kpi .lbl{font-size:12px;color:#666;margin-top:4px}
+  main{padding:0 48px 60px;display:grid;grid-template-columns:1.3fr 1fr;gap:24px}.panel{background:var(--card);border:1px solid var(--line);padding:20px 22px}.panel h2{font-size:15px;margin:0 0 4px;font-weight:600}.panel .note{font-size:12px;color:#777;margin:0 0 14px}
+  table{width:100%;border-collapse:collapse;font-size:13px} th{text-align:left;font-weight:600;font-size:11px;color:#666;padding:6px 8px;border-bottom:1px solid var(--line)} td{padding:6px 8px;border-bottom:1px solid #eee}
+  .bar{height:6px;border-radius:2px;background:#eee;position:relative;width:80px;display:inline-block;vertical-align:middle;margin-left:8px}.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:2px}.full{grid-column:1/-1}
+  .tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600}.tag.good{background:#e4f0e9;color:var(--good)}.tag.bad{background:#f5e3df;color:var(--bad)}
+  .chart{height:280px;position:relative;overflow:hidden}.chart svg{width:100%;height:100%;display:block}.chart text{font-family:Arial,sans-serif;fill:#666;font-size:10px}.chart .grid{stroke:#e8e5dc;stroke-width:1}.chart .axis{stroke:#bdb8aa;stroke-width:1}.chart .bar{fill:#1f4d63}.chart .bar2{fill:#b6883a}.chart .line{fill:none;stroke:#a3402e;stroke-width:2.5}.chart .dot{fill:#a3402e}.chart .legend{font-size:11px}
+  footer{padding:20px 48px;font-size:12px;color:#888;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header><h1>RetailLens Marketplace — Seller Scorecard</h1><p>Gold layer output of the Databricks → Snowflake pipeline. 40 sellers, six months (Jan–Jun 2025), built from the Olist-style generator (seed 42). Late rate is computed as a ratio of sums (Σ late orders / Σ orders), never an average of monthly rates.</p></header>
+<div class="kpis" id="kpis"></div>
+<main>
+<div class="panel"><h2>Monthly volume &amp; late rate</h2><p class="note">Orders and revenue by month, with the network-wide late rate overlaid. April shows the escalation.</p><div id="monthlyChart" class="chart"></div></div>
+<div class="panel"><h2>Revenue by state</h2><p class="note">Eight seller hubs, five sellers each.</p><div id="stateChart" class="chart"></div></div>
+<div class="panel"><h2>Seller leaderboard — best and worst late rate</h2><p class="note">Ranked by Σ late orders / Σ orders across all six months.</p><table id="leaderTable"></table></div>
+<div class="panel"><h2>April escalation — top 10</h2><p class="note">Late rate before vs. from April onward. A handful of sellers roughly triple.</p><table id="escTable"></table></div>
+</main>
+<footer>RetailLens Marketplace Seller Scorecard · Databricks &amp; Snowflake Capstone · data regenerated deterministically from seed 42</footer>
+<script>
+fetch('data.json').then(r=>r.json()).then(d=>{
+const kEl=document.getElementById('kpis');const kpis=[['Sellers',d.summary.sellers],['Orders (6 mo)',d.summary.orders.toLocaleString()],['Revenue','₹'+Math.round(d.summary.revenue).toLocaleString()],['Network late rate',d.summary.late_rate+'%'],['Avg review score',d.summary.avg_review+' / 5']];kEl.innerHTML=kpis.map(([l,n])=>`<div class="kpi"><div class="num">${n}</div><div class="lbl">${l}</div></div>`).join('');
+const escHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function monthlyChart(el,rows){const W=760,H=280,L=48,R=48,T=18,B=38,cw=W-L-R,ch=H-T-B,maxOrders=Math.max(...rows.map(x=>x.orders))*1.15,maxLate=Math.max(...rows.map(x=>x.late_rate_pct))*1.2,bw=cw/rows.length*.52,x=i=>L+(i+.5)*cw/rows.length,yO=v=>T+ch-(v/maxOrders)*ch,yL=v=>T+ch-(v/maxLate)*ch;const grid=[0,.25,.5,.75,1].map(t=>{const y=T+ch-t*ch;return `<line class="grid" x1="${L}" x2="${W-R}" y1="${y}" y2="${y}"/><text x="${L-7}" y="${y+3}" text-anchor="end">${Math.round(t*maxOrders)}</text><text x="${W-R+7}" y="${y+3}">${(t*maxLate).toFixed(0)}%</text>`}).join('');const bars=rows.map((r,i)=>{const y=yO(r.orders),h=T+ch-y;return `<rect class="bar" x="${x(i)-bw/2}" y="${y}" width="${bw}" height="${h}" rx="2"><title>${escHtml(r.month.slice(0,7))}: ${r.orders.toLocaleString()} orders</title></rect><text x="${x(i)}" y="${H-18}" text-anchor="middle">${escHtml(r.month.slice(0,7))}</text>`}).join('');const pts=rows.map((r,i)=>`${x(i)},${yL(r.late_rate_pct)}`).join(' ');const dots=rows.map((r,i)=>`<circle class="dot" cx="${x(i)}" cy="${yL(r.late_rate_pct)}" r="3"><title>${escHtml(r.month.slice(0,7))}: ${r.late_rate_pct}% late</title></circle>`).join('');el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Monthly orders and late rate">${grid}<line class="axis" x1="${L}" x2="${L}" y1="${T}" y2="${T+ch}"/><line class="axis" x1="${L}" x2="${W-R}" y1="${T+ch}" y2="${T+ch}"/>${bars}<polyline class="line" points="${pts}"/>${dots}<text class="legend" x="${L}" y="12">Orders</text><text class="legend" x="${W-R}" y="12" text-anchor="end">Late rate %</text></svg>`}
+function stateChart(el,rows){const W=760,H=280,L=58,R=18,T=18,B=12,cw=W-L-R,ch=H-T-B,max=Math.max(...rows.map(x=>x.revenue)),rowH=ch/rows.length,barH=Math.min(20,rowH*.62);const grid=[0,.25,.5,.75,1].map(t=>{const x=L+t*cw;return `<line class="grid" x1="${x}" x2="${x}" y1="${T}" y2="${T+ch}"/><text x="${x}" y="${H-2}" text-anchor="middle">₹${Math.round(max*t/1000)}k</text>`}).join('');const bars=rows.map((r,i)=>{const y=T+i*rowH+(rowH-barH)/2,w=r.revenue/max*cw;return `<text x="${L-8}" y="${y+barH*.72}" text-anchor="end">${escHtml(r.seller_state)}</text><rect class="bar2" x="${L}" y="${y}" width="${w}" height="${barH}" rx="2"><title>${escHtml(r.seller_state)}: ₹${Math.round(r.revenue).toLocaleString()}</title></rect>`}).join('');el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Revenue by state">${grid}${bars}</svg>`}
+monthlyChart(document.getElementById('monthlyChart'),d.monthly);stateChart(document.getElementById('stateChart'),d.state);
+const lb=d.leaderboard,best=lb.slice(0,5),worst=lb.slice(-5).reverse();const rowsHtml=rows=>rows.map(r=>{const pct=Math.min(100,r.late_rate_pct),cls=r.late_rate_pct<10?'good':'bad';return `<tr><td>${r.seller_id}</td><td>${r.seller_state}</td><td>${r.total_orders}</td><td>₹${Math.round(r.total_revenue).toLocaleString()}</td><td><span class="tag ${cls}">${r.late_rate_pct}%</span><span class="bar"><i style="width:${pct}%;background:${cls==='good'?'#2e6b4f':'#a3402e'}"></i></span></td><td>${r.avg_review}</td></tr>`}).join('');document.getElementById('leaderTable').innerHTML=`<tr><th>Seller</th><th>State</th><th>Orders</th><th>Revenue</th><th>Late rate</th><th>Avg review</th></tr>`+rowsHtml(best)+`<tr><td colspan="6" style="border-bottom:none;padding-top:12px;color:#999;font-size:11px">— worst 5 —</td></tr>`+rowsHtml(worst);
+const esc=d.escalation;document.getElementById('escTable').innerHTML=`<tr><th>Seller</th><th>Pre-April</th><th>April onward</th><th>Factor</th></tr>`+esc.map(r=>`<tr><td>${r.seller_id}</td><td>${r.pre_pct}%</td><td>${r.post_pct}%</td><td><span class="tag bad">${r.factor}×</span></td></tr>`).join('');
+});
+</script>
+</body>
+</html>
