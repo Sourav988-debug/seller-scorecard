@@ -3,6 +3,10 @@ Databricks & Snowflake Capstone · Topic 01 · Seed 42
 
 A one-row-per-seller-per-month scorecard covering orders, revenue, late-delivery rate, and average review score. The project is structured as Bronze → Silver → Gold on Databricks, exported to Snowflake, and presented through a static dashboard.
 
+## Live Dashboard
+
+**[Open the live Seller Scorecard Dashboard](https://seller-scorecard-btd3axghk-sourav988-debugs-projects.vercel.app/dashboard/)**
+
 ## Repository structure
 
 - `notebooks/` contains the generator and Bronze, Silver, and Gold transformations.
